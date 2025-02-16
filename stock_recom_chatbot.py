@@ -29,7 +29,7 @@ def set_korean_font():
     fm.fontManager.ttflist.insert(0, fe)  
     plt.rcParams.update({"font.family": "NanumGothic", "axes.unicode_minus": False})
 
-set_korean_font()  # ✅ 한글 폰트 설정 추가
+set_korean_font()  # ✅ 한 번만 실행
 
 def main():
     st.set_page_config(page_title="Stock Analysis Chatbot", page_icon=":chart_with_upwards_trend:")
@@ -209,6 +209,7 @@ def visualize_stock(company, period):
         returnfig=True
     )
     st.pyplot(fig)
+
 
 if __name__ == '__main__':
     main()
