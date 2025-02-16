@@ -75,15 +75,19 @@ def main():
         with col1:
             if st.button("1day"):
                 st.session_state.selected_period = "1day"
+                st.experimental_rerun()  # 🔄 버튼 클릭 시 즉시 반영
         with col2:
-            if st.button("week"):
+            if st.button("1week"):
                 st.session_state.selected_period = "week"
+                st.experimental_rerun()
         with col3:
             if st.button("1month"):
                 st.session_state.selected_period = "1month"
+                st.experimental_rerun()
         with col4:
             if st.button("1year"):
                 st.session_state.selected_period = "1year"
+                st.experimental_rerun()
 
         #  선택된 기간에 따라 주가 차트 업데이트
         visualize_stock(company_name, st.session_state.selected_period)
@@ -152,7 +156,7 @@ def get_ticker(company):
 def visualize_stock(company, period):
     ticker = get_ticker(company)
     if not ticker:
-        st.error("해당 기업의 티커 코드를 찾을 수 없습니다. 올바른 기업명을 입력했는지 확인해주세요.")
+        st.error("해당 기업의 티커 코드를 찾을 수 없습니다.")
         return
 
     try:
@@ -161,16 +165,17 @@ def visualize_stock(company, period):
         st.error(f"주가 데이터를 불러오는 중 오류 발생: {e}")
         return
 
-    if period == "일":
+    # ✅ 올바른 기간 필터링 (기본값 1day 유지)
+    if period == "1day":
         df = df.tail(30)
-    elif period == "주":
+    elif period == "week":
         df = df.resample('W').last()
-    elif period == "월":
+    elif period == "1month":
         df = df.resample('M').last()
-    elif period == "년":
+    elif period == "1year":
         df = df.resample('Y').last()
-
-    # returnfig=True 옵션으로 mplfinance가 Figure+Axes를 생성하게 한 뒤, st.pyplot()으로 출력
+    
+    # ✅ 차트 업데이트
     fig, _ = mpf.plot(
         df,
         type='candle',
