@@ -152,15 +152,24 @@ def visualize_stock(company, period):
         now = datetime.now()
         market_open_time = now.replace(hour=9, minute=0, second=0, microsecond=0)  # 장 시작 시간 (오전 9시)
         
-        # ✅ 새벽(장 시작 전)에는 전날 데이터를 기준으로 함
+        # ✅ 기본적으로 오늘 날짜를 설정
+        end_date = now.strftime('%Y-%m-%d')
+
+        # ✅ 새벽(9시 이전)에는 전날 데이터 가져오기
         if now < market_open_time:
-            end_date = (now - timedelta(days=1)).strftime('%Y-%m-%d')  # 전날을 기준으로 함
-        else:
-            end_date = now.strftime('%Y-%m-%d')  # 장이 열린 이후면 당일을 기준으로 함
+            end_date = (now - timedelta(days=1)).strftime('%Y-%m-%d')
+
+        # ✅ 주말(토,일) 또는 월요일 새벽(9시 이전)에는 가장 가까운 금요일 데이터 가져오기
+        if now.weekday() == 5:  # 토요일이면 금요일로 변경
+            end_date = (now - timedelta(days=1)).strftime('%Y-%m-%d')
+        elif now.weekday() == 6:  # 일요일이면 금요일로 변경
+            end_date = (now - timedelta(days=2)).strftime('%Y-%m-%d')
+        elif now.weekday() == 0 and now < market_open_time:  # 월요일 9시 이전이면 금요일로 변경
+            end_date = (now - timedelta(days=3)).strftime('%Y-%m-%d')
 
         # ✅ 선택한 기간에 따라 시작 날짜 설정
         if period == "1day":
-            start_date = end_date  # 당일 (또는 전날) 데이터
+            start_date = end_date  # 당일 (또는 전날 or 금요일) 데이터
         elif period == "week":
             start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=7)).strftime('%Y-%m-%d')
         elif period == "1month":
@@ -192,6 +201,7 @@ def visualize_stock(company, period):
         returnfig=True
     )
     st.pyplot(fig)
+
 
 
 #✅ 4. 뉴스 크롤링 & 챗봇 관련 함수
