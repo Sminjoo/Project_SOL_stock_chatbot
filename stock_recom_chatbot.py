@@ -33,7 +33,7 @@ set_korean_font()  # ✅ 한글 폰트 설정 추가
 
 def main():
     st.set_page_config(page_title="Stock Analysis Chatbot", page_icon=":chart_with_upwards_trend:")
-    st.title("_기업 정보 분석 주식 추천 :red[QA Chat]_ :chart_with_upwards_trend:")
+    st.title("_ :red[QA Chat]_ :chart_with_upwards_trend:")
 
     if "conversation" not in st.session_state:
         st.session_state.conversation = None
