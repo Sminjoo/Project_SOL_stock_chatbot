@@ -18,14 +18,18 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import os
 
-# 현재 파일(파이썬 스크립트) 기준 폰트 경로를 지정
-font_path = os.path.join(os.path.dirname(__file__), 'fonts', 'NanumGothic.ttf')
-if os.path.exists(font_path):
-    font_name = fm.FontProperties(fname=font_path).get_name()
-    plt.rcParams['font.family'] = font_name
-    plt.rcParams['axes.unicode_minus'] = False
-else:
-    st.warning("폰트 파일을 찾을 수 없습니다. 한글이 깨질 수 있습니다.")
+# 한글 폰트 설정
+def set_korean_font():
+    font_path = "/usr/share/fonts/truetype/nanum/NanumGothic.ttf"
+    if not os.path.exists(font_path):  
+        os.system("apt-get update -qq")
+        os.system("apt-get install fonts-nanum* -qq")
+    
+    fe = fm.FontEntry(fname=font_path, name="NanumGothic")
+    fm.fontManager.ttflist.insert(0, fe)  
+    plt.rcParams.update({"font.family": "NanumGothic", "axes.unicode_minus": False})
+
+set_korean_font()  # ✅ 한글 폰트 설정 추가
 
 def main():
     st.set_page_config(page_title="Stock Analysis Chatbot", page_icon=":chart_with_upwards_trend:")
