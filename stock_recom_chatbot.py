@@ -142,6 +142,34 @@ def get_ticker(company):
         st.error(f"티커 변환 중 오류 발생: {e}")
         return None
 
+# ✅ 네이버 금융 분봉 데이터 크롤러
+def get_intraday_data(ticker, minute="1", days=1):
+    """
+    네이버 금융에서 분봉 데이터를 가져옴
+    :param ticker: 종목코드 (예: '005930')
+    :param minute: '1', '5', '10' (1분, 5분, 10분 단위)
+    :param days: 며칠 치 데이터를 가져올지 (기본 1일)
+    :return: DataFrame (Datetime, Open, High, Low, Close, Volume)
+    """
+    url = f"https://fchart.stock.naver.com/sise.nhn?symbol={ticker}&timeframe=minute&count={days * 390}&requestType=0"
+    response = requests.get(url)
+    response.raise_for_status()
+    
+    # XML 형태로 데이터가 오므로 파싱
+    data = []
+    for line in response.text.split("\n"):
+        if "<item data=" in line:
+            parts = line.split('"')[1].split("|")
+            date = pd.to_datetime(parts[0])
+            open_price, high, low, close, volume = map(float, parts[1:])
+            data.append([date, open_price, high, low, close, volume])
+
+    df = pd.DataFrame(data, columns=["Date", "Open", "High", "Low", "Close", "Volume"])
+    df.set_index("Date", inplace=True)
+    
+    return df
+
+# ✅ 주가 시각화 함수
 def visualize_stock(company, period):
     ticker = get_ticker(company)
     if not ticker:
@@ -150,7 +178,7 @@ def visualize_stock(company, period):
 
     try:
         now = datetime.now()
-        market_open_time = now.replace(hour=9, minute=0, second=0, microsecond=0)  # 장 시작 시간 (오전 9시)
+        market_open_time = now.replace(hour=9, minute=0, second=0, microsecond=0)
 
         # ✅ 기본적으로 오늘 날짜를 설정
         end_date = now.strftime('%Y-%m-%d')
@@ -169,23 +197,22 @@ def visualize_stock(company, period):
 
         # ✅ 선택한 기간에 따라 시작 날짜 설정
         if period == "1day":
-            start_date = end_date  # 🔥 하루 동안의 모든 시세 데이터를 가져오기 위해 end_date 사용
+            df = get_intraday_data(ticker, minute="1", days=1)  # 1분봉 데이터 가져오기
         elif period == "week":
-            start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=7)).strftime('%Y-%m-%d')
+            df = get_intraday_data(ticker, minute="5", days=7)  # 5분봉 데이터 가져오기
         elif period == "1month":
             start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
+            df = fdr.DataReader(ticker, start_date, end_date)  # 하루 단위 데이터
         elif period == "1year":
             start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=365)).strftime('%Y-%m-%d')
-
-        # ✅ 주가 데이터 가져오기 (1day인 경우, 하루 동안의 모든 데이터 가져오기)
-        df = fdr.DataReader(ticker, start_date, end_date)
+            df = fdr.DataReader(ticker, start_date, end_date)  # 하루 단위 데이터
 
         # ✅ 빈 데이터프레임 처리
         if df.empty:
             st.warning(f"📉 {company} ({ticker}) - 해당 기간({start_date}~{end_date})에 거래된 데이터가 없습니다.")
             return
 
-        st.write(f"✅ 가져온 데이터 샘플 ({period}):\n", df.head())  # 🔥 데이터 확인용 로그
+        st.write(f"✅ 가져온 데이터 샘플 ({period}):", df.head())  # 🔥 데이터 확인용 로그
 
     except Exception as e:
         st.error(f"주가 데이터를 불러오는 중 오류 발생: {e}")
