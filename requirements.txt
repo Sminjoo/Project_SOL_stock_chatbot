@@ -15,3 +15,8 @@ mplfinance
 plotly
 loguru
 bs4
+requests
+pandas 
+beautifulsoup4 
+datetime 
+matplotlib 
