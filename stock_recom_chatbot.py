@@ -149,22 +149,25 @@ def visualize_stock(company, period):
         return
 
     try:
-        df = fdr.DataReader(ticker, '2024-01-01')
-        st.write(f"✅ 가져온 데이터 샘플:\n", df.head())  # 🔥 데이터가 정상적으로 들어오는지 확인
+        # ✅ 현재 날짜와 선택한 기간을 기준으로 데이터 가져오기
+        end_date = datetime.today().strftime('%Y-%m-%d')  # 오늘 날짜
+        if period == "1day":
+            start_date = end_date  # 당일 데이터
+        elif period == "week":
+            start_date = (datetime.today() - timedelta(days=7)).strftime('%Y-%m-%d')
+        elif period == "1month":
+            start_date = (datetime.today() - timedelta(days=30)).strftime('%Y-%m-%d')
+        elif period == "1year":
+            start_date = (datetime.today() - timedelta(days=365)).strftime('%Y-%m-%d')
+
+        # ✅ 주가 데이터 가져오기
+        df = fdr.DataReader(ticker, start_date, end_date)
+        st.write(f"✅ 가져온 데이터 샘플 ({period}):\n", df.head())  # 🔥 데이터 확인용 로그
+
     except Exception as e:
         st.error(f"주가 데이터를 불러오는 중 오류 발생: {e}")
         return
 
-    # ✅ 올바른 기간 필터링 (기본값 1day 유지)
-    if period == "1day":
-        df = df.tail(30)
-    elif period == "week":
-        df = df.resample('W').last()
-    elif period == "1month":
-        df = df.resample('M').last()
-    elif period == "1year":
-        df = df.resample('Y').last()
-    
     # ✅ 차트 업데이트
     fig, _ = mpf.plot(
         df,
