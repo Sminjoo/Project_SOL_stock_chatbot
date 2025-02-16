@@ -149,19 +149,33 @@ def visualize_stock(company, period):
         return
 
     try:
-        # ✅ 현재 날짜와 선택한 기간을 기준으로 데이터 가져오기
-        end_date = datetime.today().strftime('%Y-%m-%d')  # 오늘 날짜
+        now = datetime.now()
+        market_open_time = now.replace(hour=9, minute=0, second=0, microsecond=0)  # 장 시작 시간 (오전 9시)
+        
+        # ✅ 새벽(장 시작 전)에는 전날 데이터를 기준으로 함
+        if now < market_open_time:
+            end_date = (now - timedelta(days=1)).strftime('%Y-%m-%d')  # 전날을 기준으로 함
+        else:
+            end_date = now.strftime('%Y-%m-%d')  # 장이 열린 이후면 당일을 기준으로 함
+
+        # ✅ 선택한 기간에 따라 시작 날짜 설정
         if period == "1day":
-            start_date = end_date  # 당일 데이터
+            start_date = end_date  # 당일 (또는 전날) 데이터
         elif period == "week":
-            start_date = (datetime.today() - timedelta(days=7)).strftime('%Y-%m-%d')
+            start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=7)).strftime('%Y-%m-%d')
         elif period == "1month":
-            start_date = (datetime.today() - timedelta(days=30)).strftime('%Y-%m-%d')
+            start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
         elif period == "1year":
-            start_date = (datetime.today() - timedelta(days=365)).strftime('%Y-%m-%d')
+            start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=365)).strftime('%Y-%m-%d')
 
         # ✅ 주가 데이터 가져오기
         df = fdr.DataReader(ticker, start_date, end_date)
+
+        # ✅ 빈 데이터프레임 처리
+        if df.empty:
+            st.warning(f"📉 {company} ({ticker}) - 해당 기간({start_date}~{end_date})에 거래된 데이터가 없습니다.")
+            return
+
         st.write(f"✅ 가져온 데이터 샘플 ({period}):\n", df.head())  # 🔥 데이터 확인용 로그
 
     except Exception as e:
