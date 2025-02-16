@@ -70,28 +70,16 @@ def main():
 
         st.subheader(f"📈 {company_name} 최근 주가 추이")
 
-        # 반응형 UI 버튼 추가 (각 버튼 클릭 시 selected_period 변경)
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            if st.button("1day"):
-                st.session_state.selected_period = "1day"
-                st.experimental_rerun()  # 🔄 버튼 클릭 시 즉시 반영
-        with col2:
-            if st.button("1week"):
-                st.session_state.selected_period = "week"
-                st.experimental_rerun()
-        with col3:
-            if st.button("1month"):
-                st.session_state.selected_period = "1month"
-                st.experimental_rerun()
-        with col4:
-            if st.button("1year"):
-                st.session_state.selected_period = "1year"
-                st.experimental_rerun()
+        # 반응형 UI 버튼 추가 (선택한 기간을 즉시 반영)
+        selected_period = st.radio(
+            "기간 선택",
+            options=["1day", "week", "1month", "1year"],
+            horizontal=True
+        )
 
         #  선택된 기간에 따라 주가 차트 업데이트
-        visualize_stock(company_name, st.session_state.selected_period)
-
+        visualize_stock(company_name, selected_period)
+        
         with st.chat_message("assistant"):
             st.markdown("📢 최근 기업 뉴스 목록:")
             for news in news_data:
@@ -147,6 +135,7 @@ def get_ticker(company):
             return None
         else:
             ticker = ticker_row.iloc[0][ticker_col]
+            st.write(f"✅ 가져온 티커 코드: {ticker}")  # 🔥 티커 값 확인용 로그 추가
             # 숫자 형식인 경우 6자리 문자열로 변환 (예: 5930 -> '005930')
             return str(ticker).zfill(6)
     except Exception as e:
@@ -161,6 +150,7 @@ def visualize_stock(company, period):
 
     try:
         df = fdr.DataReader(ticker, '2024-01-01')
+        st.write(f"✅ 가져온 데이터 샘플:\n", df.head())  # 🔥 데이터가 정상적으로 들어오는지 확인
     except Exception as e:
         st.error(f"주가 데이터를 불러오는 중 오류 발생: {e}")
         return
