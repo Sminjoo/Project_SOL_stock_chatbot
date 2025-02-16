@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import os
 
-# 한글 폰트 설정
+# ✅ 1. 한글 폰트 설정
 def set_korean_font():
     font_path = "/usr/share/fonts/truetype/nanum/NanumGothic.ttf"
     if not os.path.exists(font_path):  
@@ -31,6 +31,7 @@ def set_korean_font():
 
 set_korean_font()  # ✅ 한 번만 실행
 
+# ✅ 2. 메인 실행 함수
 def main():
     st.set_page_config(page_title="Stock Analysis Chatbot", page_icon=":chart_with_upwards_trend:")
     st.title("_기업 정보 분석 주식 추천 :red[QA Chat]_ :chart_with_upwards_trend:")
@@ -42,7 +43,7 @@ def main():
     if "processComplete" not in st.session_state:
         st.session_state.processComplete = None
 
-    # ✅ 주가 시각화에 필요한 세션 상태 추가 (기본값: 1day)
+    # 주가 시각화에 필요한 세션 상태 추가 (기본값: 1day)
     if "selected_period" not in st.session_state:
         st.session_state.selected_period = "1day"
 
@@ -69,7 +70,7 @@ def main():
 
         st.subheader(f"📈 {company_name} 최근 주가 추이")
 
-        # ✅ 반응형 UI 버튼 추가 (각 버튼 클릭 시 selected_period 변경)
+        # 반응형 UI 버튼 추가 (각 버튼 클릭 시 selected_period 변경)
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             if st.button("1day"):
@@ -84,7 +85,7 @@ def main():
             if st.button("1year"):
                 st.session_state.selected_period = "1year"
 
-        # ✅ 선택된 기간에 따라 주가 차트 업데이트
+        #  선택된 기간에 따라 주가 차트 업데이트
         visualize_stock(company_name, st.session_state.selected_period)
 
         with st.chat_message("assistant"):
@@ -106,6 +107,82 @@ def main():
                     for doc in result['source_documents']:
                         st.markdown(f"- [{doc.metadata['source']}]({doc.metadata['source']})")
 
+#✅ 3. 주가 시각화 & 티커 조회 함수
+def get_ticker(company):
+    """
+    FinanceDataReader를 통해 KRX 상장 기업 정보를 불러오고,
+    입력한 기업명에 해당하는 티커 코드를 반환합니다.
+    환경에 따라 컬럼명이 다를 수 있으므로 여러 경우를 처리합니다.
+    """
+    try:
+        listing = fdr.StockListing('KRX')
+        if listing.empty:
+            listing = fdr.StockListing('KOSPI')
+        if listing.empty:
+            st.error("KRX 혹은 KOSPI 상장 기업 정보를 불러올 수 없습니다.")
+            return None
+
+        # 여러 가지 컬럼 조합에 대해 처리합니다.
+        if "Code" in listing.columns and "Name" in listing.columns:
+            name_col = "Name"
+            ticker_col = "Code"
+        elif "Symbol" in listing.columns and "Name" in listing.columns:
+            name_col = "Name"
+            ticker_col = "Symbol"
+        elif "종목코드" in listing.columns and "기업명" in listing.columns:
+            name_col = "기업명"
+            ticker_col = "종목코드"
+        else:
+            st.error("상장 기업 정보의 컬럼명이 예상과 다릅니다: " + ", ".join(listing.columns))
+            return None
+
+        # 좌우 공백 제거 후 비교
+        ticker_row = listing[listing[name_col].str.strip() == company.strip()]
+        if ticker_row.empty:
+            st.error(f"입력한 기업명 '{company}'에 해당하는 정보가 없습니다.\n예시: '삼성전자' 입력 시 티커 '005930'을 반환합니다.")
+            return None
+        else:
+            ticker = ticker_row.iloc[0][ticker_col]
+            # 숫자 형식인 경우 6자리 문자열로 변환 (예: 5930 -> '005930')
+            return str(ticker).zfill(6)
+    except Exception as e:
+        st.error(f"티커 변환 중 오류 발생: {e}")
+        return None
+
+def visualize_stock(company, period):
+    ticker = get_ticker(company)
+    if not ticker:
+        st.error("해당 기업의 티커 코드를 찾을 수 없습니다. 올바른 기업명을 입력했는지 확인해주세요.")
+        return
+
+    try:
+        df = fdr.DataReader(ticker, '2024-01-01')
+    except Exception as e:
+        st.error(f"주가 데이터를 불러오는 중 오류 발생: {e}")
+        return
+
+    if period == "일":
+        df = df.tail(30)
+    elif period == "주":
+        df = df.resample('W').last()
+    elif period == "월":
+        df = df.resample('M').last()
+    elif period == "년":
+        df = df.resample('Y').last()
+
+    # returnfig=True 옵션으로 mplfinance가 Figure+Axes를 생성하게 한 뒤, st.pyplot()으로 출력
+    fig, _ = mpf.plot(
+        df,
+        type='candle',
+        style='charles',
+        title=f"{company}({ticker}) 주가 ({period})",
+        volume=True,
+        returnfig=True
+    )
+    st.pyplot(fig)
+
+
+#✅ 4. 뉴스 크롤링 & 챗봇 관련 함수
 def crawl_news(company):
     today = datetime.today()
     start_date = (today - timedelta(days=5)).strftime('%Y%m%d')
@@ -157,80 +234,8 @@ def create_chat_chain(vectorstore, openai_api_key):
         memory=ConversationBufferMemory(memory_key='chat_history', return_messages=True, output_key='answer'),
         get_chat_history=lambda h: h, return_source_documents=True)
 
-def get_ticker(company):
-    """
-    FinanceDataReader를 통해 KRX 상장 기업 정보를 불러오고,
-    입력한 기업명에 해당하는 티커 코드를 반환합니다.
-    환경에 따라 컬럼명이 다를 수 있으므로 여러 경우를 처리합니다.
-    """
-    try:
-        listing = fdr.StockListing('KRX')
-        if listing.empty:
-            listing = fdr.StockListing('KOSPI')
-        if listing.empty:
-            st.error("KRX 혹은 KOSPI 상장 기업 정보를 불러올 수 없습니다.")
-            return None
-
-        # 여러 가지 컬럼 조합에 대해 처리합니다.
-        if "Code" in listing.columns and "Name" in listing.columns:
-            name_col = "Name"
-            ticker_col = "Code"
-        elif "Symbol" in listing.columns and "Name" in listing.columns:
-            name_col = "Name"
-            ticker_col = "Symbol"
-        elif "종목코드" in listing.columns and "기업명" in listing.columns:
-            name_col = "기업명"
-            ticker_col = "종목코드"
-        else:
-            st.error("상장 기업 정보의 컬럼명이 예상과 다릅니다: " + ", ".join(listing.columns))
-            return None
-
-        # 좌우 공백 제거 후 비교
-        ticker_row = listing[listing[name_col].str.strip() == company.strip()]
-        if ticker_row.empty:
-            st.error(f"입력한 기업명 '{company}'에 해당하는 정보가 없습니다.\n예시: '삼성전자' 입력 시 티커 '005930'을 반환합니다.")
-            return None
-        else:
-            ticker = ticker_row.iloc[0][ticker_col]
-            # 숫자 형식인 경우 6자리 문자열로 변환 (예: 5930 -> '005930')
-            return str(ticker).zfill(6)
-    except Exception as e:
-        st.error(f"티커 변환 중 오류 발생: {e}")
-        return None
 
 
-def visualize_stock(company, period):
-    ticker = get_ticker(company)
-    if not ticker:
-        st.error("해당 기업의 티커 코드를 찾을 수 없습니다. 올바른 기업명을 입력했는지 확인해주세요.")
-        return
-
-    try:
-        df = fdr.DataReader(ticker, '2024-01-01')
-    except Exception as e:
-        st.error(f"주가 데이터를 불러오는 중 오류 발생: {e}")
-        return
-
-    if period == "일":
-        df = df.tail(30)
-    elif period == "주":
-        df = df.resample('W').last()
-    elif period == "월":
-        df = df.resample('M').last()
-    elif period == "년":
-        df = df.resample('Y').last()
-
-    # returnfig=True 옵션으로 mplfinance가 Figure+Axes를 생성하게 한 뒤, st.pyplot()으로 출력
-    fig, _ = mpf.plot(
-        df,
-        type='candle',
-        style='charles',
-        title=f"{company}({ticker}) 주가 ({period})",
-        volume=True,
-        returnfig=True
-    )
-    st.pyplot(fig)
-
-
+# ✅ 실행
 if __name__ == '__main__':
     main()
