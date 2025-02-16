@@ -151,7 +151,7 @@ def visualize_stock(company, period):
     try:
         now = datetime.now()
         market_open_time = now.replace(hour=9, minute=0, second=0, microsecond=0)  # 장 시작 시간 (오전 9시)
-        
+
         # ✅ 기본적으로 오늘 날짜를 설정
         end_date = now.strftime('%Y-%m-%d')
 
@@ -169,7 +169,7 @@ def visualize_stock(company, period):
 
         # ✅ 선택한 기간에 따라 시작 날짜 설정
         if period == "1day":
-            start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
+            start_date = end_date  # 🔥 하루 동안의 모든 시세 데이터를 가져오기 위해 end_date 사용
         elif period == "week":
             start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=7)).strftime('%Y-%m-%d')
         elif period == "1month":
@@ -177,7 +177,7 @@ def visualize_stock(company, period):
         elif period == "1year":
             start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=365)).strftime('%Y-%m-%d')
 
-        # ✅ 주가 데이터 가져오기
+        # ✅ 주가 데이터 가져오기 (1day인 경우, 하루 동안의 모든 데이터 가져오기)
         df = fdr.DataReader(ticker, start_date, end_date)
 
         # ✅ 빈 데이터프레임 처리
@@ -201,6 +201,7 @@ def visualize_stock(company, period):
         returnfig=True
     )
     st.pyplot(fig)
+
 
 
 #✅ 4. 뉴스 크롤링 & 챗봇 관련 함수
