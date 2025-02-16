@@ -34,7 +34,7 @@ set_korean_font()  # ✅ 한 번만 실행
 # ✅ 2. 메인 실행 함수
 def main():
     st.set_page_config(page_title="Stock Analysis Chatbot", page_icon=":chart_with_upwards_trend:")
-    st.title("_기업 정보 분석 주식 추천 :red[QA Chat]_ :chart_with_upwards_trend:")
+    st.title("_ 분석 주식 추천 :red[QA Chat]_ :chart_with_upwards_trend:")
 
     if "conversation" not in st.session_state:
         st.session_state.conversation = None
