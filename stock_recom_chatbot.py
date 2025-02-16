@@ -17,6 +17,7 @@ from langchain.memory import ConversationBufferMemory
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import os
+import pandas as pd
 
 # ✅ 1. 한글 폰트 설정
 def set_korean_font():
