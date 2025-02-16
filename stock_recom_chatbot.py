@@ -167,29 +167,35 @@ def visualize_stock(company, period):
         elif now.weekday() == 0 and now < market_open_time:  # 월요일 9시 이전이면 금요일로 변경
             end_date = (now - timedelta(days=3)).strftime('%Y-%m-%d')
 
-        # ✅ 선택한 기간에 따라 시작 날짜 설정 및 데이터 단위 변경
+        # ✅ 선택한 기간에 따라 시작 날짜 설정
         if period == "1day":
             start_date = end_date
-            interval = "hour"  # 🔥 시간 단위 데이터
         elif period == "week":
             start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=7)).strftime('%Y-%m-%d')
-            interval = "hour"  # 🔥 시간 단위 데이터
         elif period == "1month":
             start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
-            interval = "hour"  # 🔥 시간 단위 데이터
         elif period == "1year":
             start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=365)).strftime('%Y-%m-%d')
-            interval = "day"  # 🔥 일 단위 데이터
 
         # ✅ 주가 데이터 가져오기
-        df = fdr.DataReader(ticker, start_date, end_date, interval=interval)  # 🔥 시간 단위 데이터 가져오기
+        df = fdr.DataReader(ticker, start_date, end_date)
 
         # ✅ 빈 데이터프레임 처리
         if df.empty:
             st.warning(f"📉 {company} ({ticker}) - 해당 기간({start_date}~{end_date})에 거래된 데이터가 없습니다.")
             return
 
-        st.write(f"✅ 가져온 데이터 샘플 ({period}, {interval}):\n", df.head())  # 🔥 데이터 확인용 로그
+        st.write(f"✅ 가져온 데이터 샘플 ({period}):\n", df.head())  # 🔥 데이터 확인용 로그
+
+        # ✅ 데이터 단위 변환 (resample 사용)
+        if period == "1day":
+            df = df.resample('H').last().dropna()  # 🔥 1시간 단위
+        elif period == "week":
+            df = df.resample('H').last().dropna()  # 🔥 1시간 단위
+        elif period == "1month":
+            df = df.resample('H').last().dropna()  # 🔥 1시간 단위
+        elif period == "1year":
+            df = df.resample('D').last().dropna()  # 🔥 1일 단위
 
     except Exception as e:
         st.error(f"주가 데이터를 불러오는 중 오류 발생: {e}")
@@ -205,7 +211,6 @@ def visualize_stock(company, period):
         returnfig=True
     )
     st.pyplot(fig)
-
 
 
 #✅ 4. 뉴스 크롤링 & 챗봇 관련 함수
