@@ -42,6 +42,10 @@ def main():
     if "processComplete" not in st.session_state:
         st.session_state.processComplete = None
 
+    # ✅ 주가 시각화에 필요한 세션 상태 추가 (기본값: 1day)
+    if "selected_period" not in st.session_state:
+        st.session_state.selected_period = "1day"
+
     with st.sidebar:
         openai_api_key = st.text_input("OpenAI API Key", key="chatbot_api_key", type="password")
         company_name = st.text_input("분석할 기업명 (코스피 상장)")
@@ -64,7 +68,24 @@ def main():
         st.session_state.processComplete = True
 
         st.subheader(f"📈 {company_name} 최근 주가 추이")
-        visualize_stock(company_name, "일")
+
+        # ✅ 반응형 UI 버튼 추가 (각 버튼 클릭 시 selected_period 변경)
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            if st.button("1day"):
+                st.session_state.selected_period = "1day"
+        with col2:
+            if st.button("week"):
+                st.session_state.selected_period = "week"
+        with col3:
+            if st.button("1month"):
+                st.session_state.selected_period = "1month"
+        with col4:
+            if st.button("1year"):
+                st.session_state.selected_period = "1year"
+
+        # ✅ 선택된 기간에 따라 주가 차트 업데이트
+        visualize_stock(company_name, st.session_state.selected_period)
 
         with st.chat_message("assistant"):
             st.markdown("📢 최근 기업 뉴스 목록:")
