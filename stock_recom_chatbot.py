@@ -169,7 +169,7 @@ def visualize_stock(company, period):
 
         # ✅ 선택한 기간에 따라 시작 날짜 설정
         if period == "1day":
-            start_date = end_date
+            start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
         elif period == "week":
             start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=7)).strftime('%Y-%m-%d')
         elif period == "1month":
@@ -186,16 +186,6 @@ def visualize_stock(company, period):
             return
 
         st.write(f"✅ 가져온 데이터 샘플 ({period}):\n", df.head())  # 🔥 데이터 확인용 로그
-
-        # ✅ 데이터 단위 변환 (resample 사용)
-        if period == "1day":
-            df = df.resample('H').last().dropna()  # 🔥 1시간 단위
-        elif period == "week":
-            df = df.resample('H').last().dropna()  # 🔥 1시간 단위
-        elif period == "1month":
-            df = df.resample('H').last().dropna()  # 🔥 1시간 단위
-        elif period == "1year":
-            df = df.resample('D').last().dropna()  # 🔥 1일 단위
 
     except Exception as e:
         st.error(f"주가 데이터를 불러오는 중 오류 발생: {e}")
