@@ -20,3 +20,4 @@ pandas
 beautifulsoup4 
 datetime 
 matplotlib 
+webdriver-manager
