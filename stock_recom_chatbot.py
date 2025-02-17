@@ -147,22 +147,26 @@ def get_ticker(company):
         st.error(f"티커 변환 중 오류 발생: {e}")
         return None
 
- #✅ Selenium을 활용한 네이버 금융 시간별 시세 크롤러
+ # ✅ ChromeDriver 경로 설정 (서버 환경에서 실행될 수 있도록 명시적으로 지정)
+CHROMEDRIVER_PATH = "/usr/bin/chromedriver"  # 필요에 따라 경로 변경
+
+# ✅ Selenium을 활용한 네이버 금융 시간별 시세 크롤러
 def get_intraday_data_selenium(ticker):
     """
     Selenium을 사용하여 네이버 금융에서 시간별 체결가 데이터를 가져와 DataFrame으로 반환
     :param ticker: 종목코드 (예: '035720' - 카카오)
     :return: DataFrame (Datetime, Open, High, Low, Close, Volume)
     """
-    # 📌 Selenium 브라우저 설정
+    # 📌 Selenium 브라우저 옵션 설정
     options = Options()
-    options.add_argument("--headless")  # 브라우저를 화면에 띄우지 않음
+    options.add_argument("--headless")  # GUI 없이 실행
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("user-agent=Mozilla/5.0")  # User-Agent 설정
-    
-    # 📌 WebDriver 실행
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    options.add_argument("user-agent=Mozilla/5.0")
+
+    # ✅ ChromeDriver 경로를 명시적으로 지정하여 실행
+    service = Service(CHROMEDRIVER_PATH)
+    driver = webdriver.Chrome(service=service, options=options)
 
     # 📌 데이터 저장 리스트
     data = []
@@ -209,12 +213,12 @@ def get_intraday_data_selenium(ticker):
         return pd.DataFrame()
 
     df = pd.DataFrame(data, columns=["Time", "Close", "High", "Low", "Volume"])
+    df["Date"] = datetime.today().strftime("%Y-%m-%d")  # 날짜 추가
+    df["Datetime"] = pd.to_datetime(df["Date"] + " " + df["Time"])  # 시간 합치기
+    df.set_index("Datetime", inplace=True)
+
     print(f"✅ 가져온 데이터 샘플:\n", df.head())
     return df
-
-# ✅ 실행 예시
-ticker = "035720"  # 카카오
-df = get_intraday_data_selenium(ticker)
     
 # ✅ 주가 시각화 함수
 def visualize_stock(company, period):
