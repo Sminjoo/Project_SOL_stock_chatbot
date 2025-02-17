@@ -18,6 +18,10 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import os
 import pandas as pd
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
 
 # ✅ 1. 한글 폰트 설정
 def set_korean_font():
