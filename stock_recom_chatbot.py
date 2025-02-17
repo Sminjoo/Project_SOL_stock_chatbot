@@ -150,23 +150,28 @@ def get_ticker(company):
  # ✅ ChromeDriver 경로 설정 (서버 환경에서 실행될 수 있도록 명시적으로 지정)
 CHROMEDRIVER_PATH = "/usr/bin/chromedriver"  # 필요에 따라 경로 변경
 
-# ✅ Selenium을 활용한 네이버 금융 시간별 시세 크롤러
-def get_intraday_data_selenium(ticker):
-    """
-    Selenium을 사용하여 네이버 금융에서 시간별 체결가 데이터를 가져와 DataFrame으로 반환
-    :param ticker: 종목코드 (예: '035720' - 카카오)
-    :return: DataFrame (Datetime, Open, High, Low, Close, Volume)
-    """
-    # 📌 Selenium 브라우저 옵션 설정
+# ✅ 2. ChromeDriver 자동 실행 함수
+def get_selenium_driver():
     options = Options()
     options.add_argument("--headless")  # GUI 없이 실행
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("user-agent=Mozilla/5.0")
 
-    # ✅ ChromeDriver 경로를 명시적으로 지정하여 실행
-    service = Service(CHROMEDRIVER_PATH)
+    # ✅ 자동으로 ChromeDriver 다운로드 및 실행
+    service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
+    
+    return driver
+
+# ✅ 3. 네이버 금융 시간별 시세 크롤러
+def get_intraday_data_selenium(ticker):
+    """
+    Selenium을 사용하여 네이버 금융에서 시간별 체결가 데이터를 가져와 DataFrame으로 반환
+    :param ticker: 종목코드 (예: '035720' - 카카오)
+    :return: DataFrame (Datetime, Open, High, Low, Close, Volume)
+    """
+    driver = get_selenium_driver()  # ✅ ChromeDriver 자동 실행
 
     # 📌 데이터 저장 리스트
     data = []
@@ -220,7 +225,7 @@ def get_intraday_data_selenium(ticker):
     print(f"✅ 가져온 데이터 샘플:\n", df.head())
     return df
     
-# ✅ 주가 시각화 함수
+# ✅ 4. 주가 시각화 함수
 def visualize_stock(company, period):
     ticker = get_ticker(company)
     if not ticker:
@@ -251,7 +256,6 @@ def visualize_stock(company, period):
                        style='charles', title=f"{company}({ticker}) 주가 ({period})",
                        volume=True, returnfig=True)
     st.pyplot(fig)
-
 
 #✅ 4. 뉴스 크롤링 & 챗봇 관련 함수
 def crawl_news(company):
