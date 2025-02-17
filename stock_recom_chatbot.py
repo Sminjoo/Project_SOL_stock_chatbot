@@ -156,66 +156,61 @@ def get_ticker(company):
 # ✅ 1. 네이버 금융 시간별 시세 크롤링 함수
 def get_intraday_data_bs(ticker):
     """
-    네이버 금융 iframe에서 시간별 체결가 데이터를 가져와 DataFrame으로 반환
+    네이버 금융에서 시간별 체결가 데이터를 가져와 DataFrame으로 반환 (Selenium 없이 Requests 사용)
     :param ticker: 종목코드 (예: '035720' - 카카오)
     :return: DataFrame (Datetime, Close, Volume)
     """
-    # 📌 현재 시간 기반으로 'thistime' 값 설정
-    now = datetime.now().strftime('%Y%m%d%H%M%S')
-    
-    # 📌 iframe URL 구성
-    base_url = f"https://finance.naver.com/item/sise_time.naver?code={ticker}&thistime={now}&page="
+    base_url = f"https://finance.naver.com/item/sise_time.naver?code={ticker}&page="
     headers = {"User-Agent": "Mozilla/5.0"}
-
-    data = []
-    page = 1
+    
+    price = []  # 체결가 저장 리스트
+    volume = []  # 거래량 저장 리스트
+    times = []  # 체결 시간 저장 리스트
+    page = 1  # 첫 번째 페이지부터 시작
 
     while True:
         url = base_url + str(page)
         res = requests.get(url, headers=headers)
-        time.sleep(1)  # 서버 과부하 방지
+        time.sleep(1)  # 네이버 서버 부하 방지를 위해 1초 대기
 
         soup = BeautifulSoup(res.text, "html.parser")
         rows = soup.select("table.type2 tr")
 
-        # ✅ 데이터가 없거나 마지막 페이지면 종료
+        # 데이터가 없거나 마지막 페이지면 종료
         if not rows or "체결시각" in rows[0].text:
             break
 
-        page_data = []
         for row in rows:
             cols = row.find_all("td")
-            if len(cols) < 6:
-                continue  # 데이터가 부족하면 무시
+            if len(cols) < 6:  # 데이터가 부족하면 무시
+                continue  
 
             try:
                 time_str = cols[0].text.strip()  # HH:MM 형식의 시간
                 close_price = int(cols[1].text.replace(",", ""))  # 체결가
-                volume = int(cols[5].text.replace(",", ""))  # 거래량
+                volume_data = int(cols[5].text.replace(",", ""))  # 거래량
 
-                page_data.append([time_str, close_price, volume])
+                times.append(time_str)
+                price.append(close_price)
+                volume.append(volume_data)
+
             except ValueError:
                 continue
-        
-        # ✅ 시계열 정렬을 위해 page_data 순서를 뒤집음
-        data.extend(reversed(page_data))
+
         page += 1  # 다음 페이지로 이동
 
     # ✅ DataFrame 생성 및 정리
-    if not data:
-        print("❌ 크롤링된 데이터 없음.")
+    if not price or not volume:
         return pd.DataFrame()
 
-    df = pd.DataFrame(data, columns=["Time", "Close", "Volume"])
+    df = pd.DataFrame({"Time": times, "Close": price, "Volume": volume})
     df["Date"] = datetime.today().strftime("%Y-%m-%d")  # 날짜 추가
     df["Datetime"] = pd.to_datetime(df["Date"] + " " + df["Time"])  # 시간 합치기
     df.set_index("Datetime", inplace=True)
     df = df[["Close", "Volume"]]  # 필요한 열만 남기기
 
-    print("✅ 크롤링 완료, 데이터 샘플:")
-    print(df.head())  # 가져온 데이터 샘플 출력
-
     return df
+
 
     
 # ✅ 2. 주가 시각화 함수
