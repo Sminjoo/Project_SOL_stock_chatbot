@@ -21,7 +21,6 @@ import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
 
 # ✅ 1. 한글 폰트 설정
 def set_korean_font():
@@ -147,21 +146,18 @@ def get_ticker(company):
         st.error(f"티커 변환 중 오류 발생: {e}")
         return None
 
- # ✅ ChromeDriver 경로 설정 (서버 환경에서 실행될 수 있도록 명시적으로 지정)
-CHROMEDRIVER_PATH = "/usr/bin/chromedriver"  # 필요에 따라 경로 변경
-
-# ✅ 2. ChromeDriver 자동 실행 함수
+# ✅ Chromium 사용 설정
 def get_selenium_driver():
     options = Options()
-    options.add_argument("--headless")  # GUI 없이 실행
+    options.add_argument("--headless")  # 화면 없이 실행
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("user-agent=Mozilla/5.0")
+    options.binary_location = "/usr/bin/chromium-browser"  # ✅ Chromium 경로 지정
 
-    # ✅ 자동으로 ChromeDriver 다운로드 및 실행
-    service = Service(ChromeDriverManager().install())
+    # ✅ 자동으로 ChromeDriver 대신 Chromium 사용
+    service = Service("/usr/bin/chromedriver")  # ✅ Chromium과 호환되는 기본 드라이버 사용
     driver = webdriver.Chrome(service=service, options=options)
-    
+
     return driver
 
 # ✅ 3. 네이버 금융 시간별 시세 크롤러
@@ -171,7 +167,7 @@ def get_intraday_data_selenium(ticker):
     :param ticker: 종목코드 (예: '035720' - 카카오)
     :return: DataFrame (Datetime, Open, High, Low, Close, Volume)
     """
-    driver = get_selenium_driver()  # ✅ ChromeDriver 자동 실행
+    driver = get_selenium_driver()  # ✅ Chromium  자동 실행
 
     # 📌 데이터 저장 리스트
     data = []
