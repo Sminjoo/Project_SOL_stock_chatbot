@@ -156,11 +156,15 @@ def get_ticker(company):
 # ✅ 1. 네이버 금융 시간별 시세 크롤링 함수
 def get_intraday_data_bs(ticker):
     """
-    네이버 금융에서 시간별 체결가 데이터를 가져와 DataFrame으로 반환 (Selenium 없이 Requests 사용)
+    네이버 금융 iframe에서 시간별 체결가 데이터를 가져와 DataFrame으로 반환
     :param ticker: 종목코드 (예: '035720' - 카카오)
     :return: DataFrame (Datetime, Close, Volume)
     """
-    base_url = f"https://finance.naver.com/item/sise_time.naver?code={ticker}&page="
+    # 📌 현재 시간 기반으로 'thistime' 값 설정
+    now = datetime.now().strftime('%Y%m%d%H%M%S')
+    
+    # 📌 iframe URL 구성
+    base_url = f"https://finance.naver.com/item/sise_time.naver?code={ticker}&thistime={now}&page="
     headers = {"User-Agent": "Mozilla/5.0"}
 
     data = []
@@ -169,12 +173,12 @@ def get_intraday_data_bs(ticker):
     while True:
         url = base_url + str(page)
         res = requests.get(url, headers=headers)
-        time.sleep(1)  # 네이버 서버 부담 방지
+        time.sleep(1)  # 서버 과부하 방지
 
         soup = BeautifulSoup(res.text, "html.parser")
         rows = soup.select("table.type2 tr")
 
-        # 데이터가 없거나 마지막 페이지면 종료
+        # ✅ 데이터가 없거나 마지막 페이지면 종료
         if not rows or "체결시각" in rows[0].text:
             break
 
@@ -199,6 +203,7 @@ def get_intraday_data_bs(ticker):
 
     # ✅ DataFrame 생성 및 정리
     if not data:
+        print("❌ 크롤링된 데이터 없음.")
         return pd.DataFrame()
 
     df = pd.DataFrame(data, columns=["Time", "Close", "Volume"])
@@ -206,6 +211,9 @@ def get_intraday_data_bs(ticker):
     df["Datetime"] = pd.to_datetime(df["Date"] + " " + df["Time"])  # 시간 합치기
     df.set_index("Datetime", inplace=True)
     df = df[["Close", "Volume"]]  # 필요한 열만 남기기
+
+    print("✅ 크롤링 완료, 데이터 샘플:")
+    print(df.head())  # 가져온 데이터 샘플 출력
 
     return df
 
