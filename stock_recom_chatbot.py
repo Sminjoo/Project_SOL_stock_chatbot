@@ -223,6 +223,14 @@ def visualize_stock(company, period):
         if period in ["1day", "week"]:
             days = 1 if period == "1day" else 5
             df = get_intraday_data_naver(ticker, days=days)  # ✅ 올바른 함수 호출
+
+            # 📌 필요한 컬럼 생성 (Open, High, Low 추가)
+            df["Open"] = df["Close"]
+            df["High"] = df["Close"]
+            df["Low"] = df["Close"]
+
+            df = df[["Open", "High", "Low", "Close", "Volume"]]  # ✅ mplfinance 포맷 맞춤
+
         else:
             end_date = now.strftime('%Y-%m-%d')
             start_date = (now - timedelta(days=30 if period == "1month" else 365)).strftime('%Y-%m-%d')
@@ -248,8 +256,6 @@ def visualize_stock(company, period):
         returnfig=True
     )
     st.pyplot(fig)
-
-
 
 
 #✅ 4. 뉴스 크롤링 & 챗봇 관련 함수
