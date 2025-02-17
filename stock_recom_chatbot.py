@@ -143,33 +143,64 @@ def get_ticker(company):
         st.error(f"티커 변환 중 오류 발생: {e}")
         return None
 
-# ✅ 네이버 금융 분봉 데이터 크롤러
-def get_intraday_data(ticker, minute="1", days=1):
+# ✅ 네이버 금융 체결가 데이터 크롤링 함수
+def get_intraday_data_naver(ticker, days=1):
     """
-    네이버 금융에서 분봉 데이터를 가져옴
-    :param ticker: 종목코드 (예: '005930')
-    :param minute: '1', '5', '10' (1분, 5분, 10분 단위)
-    :param days: 며칠 치 데이터를 가져올지 (기본 1일)
-    :return: DataFrame (Datetime, Open, High, Low, Close, Volume)
+    네이버 금융에서 시간별 시세(체결가) 데이터를 가져와 DataFrame으로 반환
+    :param ticker: 종목코드 (예: '035720' - 카카오)
+    :param days: 1일(당일) 또는 5일(주간 데이터)
+    :return: DataFrame (Datetime, Close, Volume)
     """
-    url = f"https://fchart.stock.naver.com/sise.nhn?symbol={ticker}&timeframe=minute&count={days * 390}&requestType=0"
-    response = requests.get(url)
-    response.raise_for_status()
-    
-    # XML 형태로 데이터가 오므로 파싱
     data = []
-    for line in response.text.split("\n"):
-        if "<item data=" in line:
-            parts = line.split('"')[1].split("|")
-            date = pd.to_datetime(parts[0])
-            open_price, high, low, close, volume = map(float, parts[1:])
-            data.append([date, open_price, high, low, close, volume])
+    
+    # 📌 현재 날짜 & 주말 처리
+    now = datetime.now()
+    if now.weekday() == 5:  # 토요일 → 금요일 데이터로 변경
+        now -= timedelta(days=1)
+    elif now.weekday() == 6:  # 일요일 → 금요일 데이터로 변경
+        now -= timedelta(days=2)
+    elif now.weekday() == 0 and now.hour < 9:  # 월요일 오전 9시 이전 → 금요일 데이터로 변경
+        now -= timedelta(days=3)
 
-    df = pd.DataFrame(data, columns=["Date", "Open", "High", "Low", "Close", "Volume"])
+    # 📌 `thistime` 값 설정 (최근 장 마감 시간: 16:00 기준)
+    thistime = now.strftime('%Y%m%d') + "160000"
+
+    for page in range(1, 6):  # 최대 5페이지 크롤링
+        url = f"https://finance.naver.com/item/sise_time.naver?code={ticker}&thistime={thistime}&page={page}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, "html.parser")
+        rows = soup.select("table.type2 tr")
+
+        for row in rows:
+            cols = row.find_all("td")
+            if len(cols) < 6:  # 데이터가 부족하면 무시
+                continue
+
+            try:
+                time_str = cols[0].text.strip()  # HH:MM 형식 시간
+                price = int(cols[1].text.replace(",", ""))  # 체결가
+                volume = int(cols[5].text.replace(",", ""))  # 거래량
+
+                # 📌 날짜+시간을 결합하여 timestamp 생성
+                full_datetime = datetime.strptime(f"{now.strftime('%Y-%m-%d')} {time_str}", "%Y-%m-%d %H:%M")
+
+                data.append([full_datetime, price, volume])
+
+            except ValueError:
+                continue  # 변환 실패 데이터 무시
+
+        time.sleep(0.5)  # 서버 부하 방지
+
+    if not data:
+        return pd.DataFrame()  # 빈 데이터프레임 반환
+
+    df = pd.DataFrame(data, columns=["Date", "Close", "Volume"])
     df.set_index("Date", inplace=True)
     
-    return df
-
+    return df.sort_index()  # 시간순 정렬
 # ✅ 주가 시각화 함수
 def visualize_stock(company, period):
     ticker = get_ticker(company)
