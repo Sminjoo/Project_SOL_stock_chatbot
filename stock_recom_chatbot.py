@@ -201,6 +201,7 @@ def get_intraday_data_naver(ticker, days=1):
     df.set_index("Date", inplace=True)
     
     return df.sort_index()  # 시간순 정렬
+    
 # ✅ 주가 시각화 함수
 def visualize_stock(company, period):
     ticker = get_ticker(company)
@@ -210,38 +211,25 @@ def visualize_stock(company, period):
 
     try:
         now = datetime.now()
-        market_open_time = now.replace(hour=9, minute=0, second=0, microsecond=0)
 
-        # ✅ 기본적으로 오늘 날짜를 설정
-        end_date = now.strftime('%Y-%m-%d')
+        # 📌 주말(토, 일) 또는 월요일 오전 9시 이전이면 금요일 데이터 사용
+        if now.weekday() == 5:  # 토요일이면 금요일 데이터 가져오기
+            now -= timedelta(days=1)
+        elif now.weekday() == 6:  # 일요일이면 금요일 데이터 가져오기
+            now -= timedelta(days=2)
+        elif now.weekday() == 0 and now.hour < 9:  # 월요일 오전 9시 이전이면 금요일 데이터 가져오기
+            now -= timedelta(days=3)
 
-        # ✅ 새벽(9시 이전)에는 전날 데이터 가져오기
-        if now < market_open_time:
-            end_date = (now - timedelta(days=1)).strftime('%Y-%m-%d')
+        if period in ["1day", "week"]:
+            days = 1 if period == "1day" else 5
+            df = get_intraday_data_naver(ticker, days=days)  # ✅ 올바른 함수 호출
+        else:
+            end_date = now.strftime('%Y-%m-%d')
+            start_date = (now - timedelta(days=30 if period == "1month" else 365)).strftime('%Y-%m-%d')
+            df = fdr.DataReader(ticker, start_date, end_date)  # 기존 데이터 활용
 
-        # ✅ 주말(토,일) 또는 월요일 새벽(9시 이전)에는 가장 가까운 금요일 데이터 가져오기
-        if now.weekday() == 5:  # 토요일이면 금요일로 변경
-            end_date = (now - timedelta(days=1)).strftime('%Y-%m-%d')
-        elif now.weekday() == 6:  # 일요일이면 금요일로 변경
-            end_date = (now - timedelta(days=2)).strftime('%Y-%m-%d')
-        elif now.weekday() == 0 and now < market_open_time:  # 월요일 9시 이전이면 금요일로 변경
-            end_date = (now - timedelta(days=3)).strftime('%Y-%m-%d')
-
-        # ✅ 선택한 기간에 따라 시작 날짜 설정
-        if period == "1day":
-            df = get_intraday_data(ticker, minute="1", days=1)  # 1분봉 데이터 가져오기
-        elif period == "week":
-            df = get_intraday_data(ticker, minute="5", days=7)  # 5분봉 데이터 가져오기
-        elif period == "1month":
-            start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
-            df = fdr.DataReader(ticker, start_date, end_date)  # 하루 단위 데이터
-        elif period == "1year":
-            start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=365)).strftime('%Y-%m-%d')
-            df = fdr.DataReader(ticker, start_date, end_date)  # 하루 단위 데이터
-
-        # ✅ 빈 데이터프레임 처리
         if df.empty:
-            st.warning(f"📉 {company} ({ticker}) - 해당 기간({start_date}~{end_date})에 거래된 데이터가 없습니다.")
+            st.warning(f"📉 {company} ({ticker}) - 해당 기간({period})의 거래 데이터가 없습니다.")
             return
 
         st.write(f"✅ 가져온 데이터 샘플 ({period}):", df.head())  # 🔥 데이터 확인용 로그
@@ -250,16 +238,17 @@ def visualize_stock(company, period):
         st.error(f"주가 데이터를 불러오는 중 오류 발생: {e}")
         return
 
-    # ✅ 차트 업데이트
+    # ✅ 차트 그리기
     fig, _ = mpf.plot(
         df,
-        type='candle',
+        type='line' if period in ["1day", "week"] else 'candle',  # 단기 데이터는 라인 차트
         style='charles',
         title=f"{company}({ticker}) 주가 ({period})",
         volume=True,
         returnfig=True
     )
     st.pyplot(fig)
+
 
 
 
