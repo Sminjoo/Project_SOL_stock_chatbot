@@ -143,7 +143,7 @@ def get_ticker(company):
         st.error(f"티커 변환 중 오류 발생: {e}")
         return None
 
- ✅ Selenium을 활용한 네이버 금융 시간별 시세 크롤러
+ #✅ Selenium을 활용한 네이버 금융 시간별 시세 크롤러
 def get_intraday_data_selenium(ticker):
     """
     Selenium을 사용하여 네이버 금융에서 시간별 체결가 데이터를 가져와 DataFrame으로 반환
