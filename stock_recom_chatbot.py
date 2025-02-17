@@ -19,8 +19,8 @@ import matplotlib.font_manager as fm
 import os
 import pandas as pd
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.firefox.service import Service as FirefoxService
+from selenium.webdriver.firefox.options import Options as FirefoxOptions
 
 # ✅ 1. 한글 폰트 설정
 def set_korean_font():
@@ -146,17 +146,15 @@ def get_ticker(company):
         st.error(f"티커 변환 중 오류 발생: {e}")
         return None
 
-# ✅ Chromium 사용 설정
+# ✅ 2. Firefox WebDriver 사용 설정 (설치 없이 실행 가능)
 def get_selenium_driver():
-    options = Options()
-    options.add_argument("--headless")  # 화면 없이 실행
+    options = FirefoxOptions()
+    options.add_argument("--headless")  # GUI 없이 실행
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.binary_location = "/usr/bin/chromium-browser"  # ✅ Chromium 경로 지정
 
-    # ✅ 자동으로 ChromeDriver 대신 Chromium 사용
-    service = Service("/usr/bin/chromedriver")  # ✅ Chromium과 호환되는 기본 드라이버 사용
-    driver = webdriver.Chrome(service=service, options=options)
+    service = FirefoxService()  # ✅ Firefox WebDriver 실행
+    driver = webdriver.Firefox(service=service, options=options)
 
     return driver
 
@@ -167,7 +165,7 @@ def get_intraday_data_selenium(ticker):
     :param ticker: 종목코드 (예: '035720' - 카카오)
     :return: DataFrame (Datetime, Open, High, Low, Close, Volume)
     """
-    driver = get_selenium_driver()  # ✅ Chromium  자동 실행
+    driver = get_selenium_driver()  # ✅ Firefox WebDriver 사용
 
     # 📌 데이터 저장 리스트
     data = []
@@ -253,7 +251,7 @@ def visualize_stock(company, period):
                        volume=True, returnfig=True)
     st.pyplot(fig)
 
-#✅ 4. 뉴스 크롤링 & 챗봇 관련 함수
+#✅ 5. 뉴스 크롤링 & 챗봇 관련 함수
 def crawl_news(company):
     today = datetime.today()
     start_date = (today - timedelta(days=5)).strftime('%Y%m%d')
