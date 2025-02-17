@@ -143,29 +143,30 @@ def get_ticker(company):
         st.error(f"티커 변환 중 오류 발생: {e}")
         return None
 
-# ✅ 네이버 금융 체결가 데이터 크롤링 함수
-def get_intraday_data_naver(ticker, days=1):
+# ✅ 네이버 금융 시간별 체결가 데이터 크롤링 (오늘 오전 9시부터 현재까지)
+def get_intraday_data_naver(ticker):
     """
-    네이버 금융에서 시간별 시세(체결가) 데이터를 가져와 DataFrame으로 반환
+    네이버 금융에서 당일 시간별 체결가 데이터를 가져와 DataFrame으로 반환
     :param ticker: 종목코드 (예: '035720' - 카카오)
-    :param days: 1일(당일) 또는 5일(주간 데이터)
-    :return: DataFrame (Datetime, Close, Volume)
+    :return: DataFrame (Datetime, Open, High, Low, Close, Volume)
     """
     data = []
     
-    # 📌 현재 날짜 & 주말 처리
+    # 📌 현재 날짜 기준
     now = datetime.now()
-    if now.weekday() == 5:  # 토요일 → 금요일 데이터로 변경
+
+    # 📌 주말(토, 일) 또는 월요일 오전 9시 이전이면 금요일 데이터 가져오기
+    if now.weekday() == 5:  # 토요일 → 금요일로 변경
         now -= timedelta(days=1)
-    elif now.weekday() == 6:  # 일요일 → 금요일 데이터로 변경
+    elif now.weekday() == 6:  # 일요일 → 금요일로 변경
         now -= timedelta(days=2)
-    elif now.weekday() == 0 and now.hour < 9:  # 월요일 오전 9시 이전 → 금요일 데이터로 변경
+    elif now.weekday() == 0 and now.hour < 9:  # 월요일 오전 9시 이전 → 금요일로 변경
         now -= timedelta(days=3)
 
-    # 📌 `thistime` 값 설정 (최근 장 마감 시간: 16:00 기준)
-    thistime = now.strftime('%Y%m%d') + "160000"
+    # 📌 `thistime` 값 설정 (현재 날짜와 현재 시간)
+    thistime = now.strftime('%Y%m%d%H%M%S')
 
-    for page in range(1, 6):  # 최대 5페이지 크롤링
+    for page in range(1, 6):  # 최신 데이터 우선 최대 5페이지 크롤링
         url = f"https://finance.naver.com/item/sise_time.naver?code={ticker}&thistime={thistime}&page={page}"
         headers = {"User-Agent": "Mozilla/5.0"}
         response = requests.get(url, headers=headers)
@@ -176,28 +177,34 @@ def get_intraday_data_naver(ticker, days=1):
 
         for row in rows:
             cols = row.find_all("td")
-            if len(cols) < 6:  # 데이터가 부족하면 무시
+            if len(cols) < 6:  # 유효한 데이터인지 확인
                 continue
 
             try:
-                time_str = cols[0].text.strip()  # HH:MM 형식 시간
+                time_str = cols[0].text.strip()  # HH:MM 형식의 시간
                 price = int(cols[1].text.replace(",", ""))  # 체결가
                 volume = int(cols[5].text.replace(",", ""))  # 거래량
-
+                
                 # 📌 날짜+시간을 결합하여 timestamp 생성
                 full_datetime = datetime.strptime(f"{now.strftime('%Y-%m-%d')} {time_str}", "%Y-%m-%d %H:%M")
 
-                data.append([full_datetime, price, volume])
+                # 장 시작(9:00) 이후의 데이터만 저장
+                if full_datetime.hour >= 9:
+                    data.append([full_datetime, price, volume])
 
             except ValueError:
-                continue  # 변환 실패 데이터 무시
+                continue  # 데이터 변환 오류 시 무시
 
         time.sleep(0.5)  # 서버 부하 방지
 
     if not data:
-        return pd.DataFrame()  # 빈 데이터프레임 반환
+        return pd.DataFrame()  # 빈 DataFrame 반환
 
+    # ✅ Open, High, Low 추가 (현재 체결가 데이터만 존재하므로 동일 값 사용)
     df = pd.DataFrame(data, columns=["Date", "Close", "Volume"])
+    df["Open"] = df["Close"]  # Open = Close
+    df["High"] = df["Close"]  # High = Close
+    df["Low"] = df["Close"]   # Low = Close
     df.set_index("Date", inplace=True)
     
     return df.sort_index()  # 시간순 정렬
@@ -221,20 +228,14 @@ def visualize_stock(company, period):
             now -= timedelta(days=3)
 
         if period in ["1day", "week"]:
-            days = 1 if period == "1day" else 5
-            df = get_intraday_data_naver(ticker, days=days)  # ✅ 올바른 함수 호출
-
-            # 📌 필요한 컬럼 생성 (Open, High, Low 추가)
-            df["Open"] = df["Close"]
-            df["High"] = df["Close"]
-            df["Low"] = df["Close"]
-
-            df = df[["Open", "High", "Low", "Close", "Volume"]]  # ✅ mplfinance 포맷 맞춤
-
+            # ✅ 1day: 오늘 9시부터 현재까지
+            # ✅ week: 최근 5일치 시간별 데이터
+            df = get_intraday_data_naver(ticker)
         else:
+            # ✅ month, year은 FinanceDataReader(FDR) 활용
             end_date = now.strftime('%Y-%m-%d')
             start_date = (now - timedelta(days=30 if period == "1month" else 365)).strftime('%Y-%m-%d')
-            df = fdr.DataReader(ticker, start_date, end_date)  # 기존 데이터 활용
+            df = fdr.DataReader(ticker, start_date, end_date)
 
         if df.empty:
             st.warning(f"📉 {company} ({ticker}) - 해당 기간({period})의 거래 데이터가 없습니다.")
