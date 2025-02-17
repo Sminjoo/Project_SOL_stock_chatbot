@@ -144,6 +144,7 @@ def get_ticker(company):
         return None
 
 # ✅ 네이버 금융 체결가 데이터 크롤링 함수 (모든 페이지 크롤링)
+# ✅ 네이버 금융 체결가 데이터 크롤링 함수 (모든 페이지 크롤링)
 def get_intraday_data_naver(ticker):
     """
     네이버 금융에서 당일 시간별 체결가 데이터를 가져와 DataFrame으로 반환
@@ -164,22 +165,23 @@ def get_intraday_data_naver(ticker):
     elif now.weekday() == 0 and now.hour < 9:  # 월요일 오전 9시 이전 → 금요일로 변경
         now -= timedelta(days=3)
 
-    # 📌 `thistime` 값을 오늘 날짜 00:00 → 현재 시간 기준으로 변경 (최신 데이터 반영)
+    # 📌 `thistime` 값을 현재 시간 기준으로 설정 (최신 데이터 반영)
     thistime = now.strftime('%Y%m%d%H%M%S')
     
-    # ✅ 1. 전체 페이지 수 확인 (디버깅 추가)
+    # ✅ 1. 전체 페이지 수 확인 (마지막 페이지 찾기)
     url = f"https://finance.naver.com/item/sise_time.naver?code={ticker}&thistime={thistime}&page=1"
     response = requests.get(url, headers=headers)
     response.raise_for_status()
     soup = BeautifulSoup(response.text, "html.parser")
 
-    pgrr = soup.find("td", class_="pgRR")  # 페이지네이션 태그 찾기
-    if pgrr and pgrr.a:  # 마지막 페이지 정보 찾기
-        last_page = int(pgrr.a["href"].split("=")[-1])
+    # 페이지네이션에서 마지막 페이지 번호 찾기
+    pgrr = soup.find("td", class_="pgRR")
+    if pgrr and pgrr.a:
+        last_page = int(pgrr.a["href"].split("=")[-1])  # 마지막 페이지 번호 추출
     else:
-        last_page = 1  # 페이지 정보가 없으면 기본 1페이지로 설정
+        last_page = 1  # 페이지 정보가 없으면 기본 1페이지 설정
 
-    st.write(f"📢 총 페이지 수: {last_page}")  # 디버깅 로그 출력
+    print(f"📢 총 페이지 수: {last_page}")  # 디버깅 로그 출력
 
     # ✅ 2. 모든 페이지 크롤링 (1페이지부터 마지막 페이지까지)
     for page in range(1, last_page + 1):
@@ -192,7 +194,7 @@ def get_intraday_data_naver(ticker):
 
         for row in rows:
             cols = row.find_all("td")
-            if len(cols) < 6:  # 유효한 데이터인지 확인
+            if len(cols) < 7:  # 유효한 데이터인지 확인
                 continue
 
             try:
@@ -215,7 +217,7 @@ def get_intraday_data_naver(ticker):
         time.sleep(0.5)  # 서버 부하 방지
 
     if not data:
-        st.write("❌ 데이터가 없습니다. 네이버 페이지 구조 변경 가능성 있음.")  # 디버깅 메시지 출력
+        print("❌ 데이터가 없습니다. 네이버 페이지 구조 변경 가능성 있음.")  # 디버깅 메시지 출력
         return pd.DataFrame()  # 빈 DataFrame 반환
 
     # ✅ DataFrame 생성 및 정리
@@ -223,7 +225,7 @@ def get_intraday_data_naver(ticker):
     df["Open"] = df["Close"]  # Open 값은 Close 값으로 채움
     df.set_index("Date", inplace=True)
 
-    st.write(f"✅ 가져온 데이터 샘플 ({ticker}):", df.head())  # 디버깅 로그 출력
+    print(f"✅ 가져온 데이터 샘플 ({ticker}):", df.head())  # 디버깅 로그 출력
     return df.sort_index()  # 시간순 정렬
     
 # ✅ 주가 시각화 함수
@@ -257,6 +259,7 @@ def visualize_stock(company, period):
                        style='charles', title=f"{company}({ticker}) 주가 ({period})",
                        volume=True, returnfig=True)
     st.pyplot(fig)
+
 
 
 
