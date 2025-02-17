@@ -143,7 +143,7 @@ def get_ticker(company):
         st.error(f"티커 변환 중 오류 발생: {e}")
         return None
 
-# ✅ 네이버 금융 시간별 체결가 데이터 크롤링 (오늘 오전 9시부터 현재까지)
+# ✅ 네이버 금융 체결가 데이터 크롤링 함수 (모든 페이지 크롤링)
 def get_intraday_data_naver(ticker):
     """
     네이버 금융에서 당일 시간별 체결가 데이터를 가져와 DataFrame으로 반환
@@ -151,8 +151,9 @@ def get_intraday_data_naver(ticker):
     :return: DataFrame (Datetime, Open, High, Low, Close, Volume)
     """
     data = []
+    headers = {"User-Agent": "Mozilla/5.0"}
     
-    # 📌 현재 날짜 기준
+    # 📌 현재 날짜 기준 (오늘 00:00 기준으로 설정)
     now = datetime.now()
 
     # 📌 주말(토, 일) 또는 월요일 오전 9시 이전이면 금요일 데이터 가져오기
@@ -163,12 +164,24 @@ def get_intraday_data_naver(ticker):
     elif now.weekday() == 0 and now.hour < 9:  # 월요일 오전 9시 이전 → 금요일로 변경
         now -= timedelta(days=3)
 
-    # 📌 `thistime` 값 설정 (현재 날짜와 현재 시간)
-    thistime = now.strftime('%Y%m%d%H%M%S')
+    # 📌 `thistime` 값을 오늘 날짜 00:00으로 설정 (최신 데이터 반영)
+    thistime = now.strftime('%Y%m%d000000')
+    
+    # ✅ 1. 전체 페이지 수 확인
+    url = f"https://finance.naver.com/item/sise_time.naver?code={ticker}&thistime={thistime}&page=1"
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    soup = BeautifulSoup(response.text, "html.parser")
 
-    for page in range(1, 6):  # 최신 데이터 우선 최대 5페이지 크롤링
+    pgrr = soup.find("td", class_="pgRR")  # 페이지네이션 태그 찾기
+    if pgrr and pgrr.a:  # 마지막 페이지 정보 찾기
+        last_page = int(pgrr.a["href"].split("=")[-1])
+    else:
+        last_page = 1  # 페이지 정보가 없으면 기본 1페이지로 설정
+
+    # ✅ 2. 모든 페이지 크롤링 (1페이지부터 마지막 페이지까지)
+    for page in range(1, last_page + 1):
         url = f"https://finance.naver.com/item/sise_time.naver?code={ticker}&thistime={thistime}&page={page}"
-        headers = {"User-Agent": "Mozilla/5.0"}
         response = requests.get(url, headers=headers)
         response.raise_for_status()
         
@@ -182,7 +195,9 @@ def get_intraday_data_naver(ticker):
 
             try:
                 time_str = cols[0].text.strip()  # HH:MM 형식의 시간
-                price = int(cols[1].text.replace(",", ""))  # 체결가
+                close_price = int(cols[1].text.replace(",", ""))  # 체결가
+                high_price = int(cols[3].text.replace(",", ""))  # 매도 가격 (최고가로 활용)
+                low_price = int(cols[4].text.replace(",", ""))  # 매수 가격 (최저가로 활용)
                 volume = int(cols[5].text.replace(",", ""))  # 거래량
                 
                 # 📌 날짜+시간을 결합하여 timestamp 생성
@@ -190,7 +205,7 @@ def get_intraday_data_naver(ticker):
 
                 # 장 시작(9:00) 이후의 데이터만 저장
                 if full_datetime.hour >= 9:
-                    data.append([full_datetime, price, volume])
+                    data.append([full_datetime, close_price, high_price, low_price, volume])
 
             except ValueError:
                 continue  # 데이터 변환 오류 시 무시
@@ -200,13 +215,11 @@ def get_intraday_data_naver(ticker):
     if not data:
         return pd.DataFrame()  # 빈 DataFrame 반환
 
-    # ✅ Open, High, Low 추가 (현재 체결가 데이터만 존재하므로 동일 값 사용)
-    df = pd.DataFrame(data, columns=["Date", "Close", "Volume"])
-    df["Open"] = df["Close"]  # Open = Close
-    df["High"] = df["Close"]  # High = Close
-    df["Low"] = df["Close"]   # Low = Close
+    # ✅ DataFrame 생성 및 정리
+    df = pd.DataFrame(data, columns=["Date", "Close", "High", "Low", "Volume"])
+    df["Open"] = df["Close"]  # Open 값은 Close 값으로 채움
     df.set_index("Date", inplace=True)
-    
+
     return df.sort_index()  # 시간순 정렬
     
 # ✅ 주가 시각화 함수
@@ -228,8 +241,8 @@ def visualize_stock(company, period):
             now -= timedelta(days=3)
 
         if period in ["1day", "week"]:
-            # ✅ 1day: 오늘 9시부터 현재까지
-            # ✅ week: 최근 5일치 시간별 데이터
+            # ✅ 1day: 오늘 9시부터 현재까지 (네이버 금융 시간별 체결가 활용)
+            # ✅ week: 최근 5일 동안의 시간별 데이터 (네이버 금융 활용)
             df = get_intraday_data_naver(ticker)
         else:
             # ✅ month, year은 FinanceDataReader(FDR) 활용
@@ -257,6 +270,7 @@ def visualize_stock(company, period):
         returnfig=True
     )
     st.pyplot(fig)
+
 
 
 #✅ 4. 뉴스 크롤링 & 챗봇 관련 함수
