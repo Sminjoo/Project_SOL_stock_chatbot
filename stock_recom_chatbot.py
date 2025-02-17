@@ -143,59 +143,45 @@ def get_ticker(company):
         st.error(f"티커 변환 중 오류 발생: {e}")
         return None
 
-# ✅ 네이버 금융 체결가 데이터 크롤링 함수 (모든 페이지 크롤링)
-# ✅ 네이버 금융 체결가 데이터 크롤링 함수 (모든 페이지 크롤링)
-def get_intraday_data_naver(ticker):
+ ✅ Selenium을 활용한 네이버 금융 시간별 시세 크롤러
+def get_intraday_data_selenium(ticker):
     """
-    네이버 금융에서 당일 시간별 체결가 데이터를 가져와 DataFrame으로 반환
+    Selenium을 사용하여 네이버 금융에서 시간별 체결가 데이터를 가져와 DataFrame으로 반환
     :param ticker: 종목코드 (예: '035720' - 카카오)
     :return: DataFrame (Datetime, Open, High, Low, Close, Volume)
     """
+    # 📌 Selenium 브라우저 설정
+    options = Options()
+    options.add_argument("--headless")  # 브라우저를 화면에 띄우지 않음
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("user-agent=Mozilla/5.0")  # User-Agent 설정
+    
+    # 📌 WebDriver 실행
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+
+    # 📌 데이터 저장 리스트
     data = []
-    headers = {"User-Agent": "Mozilla/5.0"}
-    
-    # 📌 현재 날짜 기준 (오늘 00:00 기준으로 설정)
-    now = datetime.now()
 
-    # 📌 주말(토, 일) 또는 월요일 오전 9시 이전이면 금요일 데이터 가져오기
-    if now.weekday() == 5:  # 토요일 → 금요일로 변경
-        now -= timedelta(days=1)
-    elif now.weekday() == 6:  # 일요일 → 금요일로 변경
-        now -= timedelta(days=2)
-    elif now.weekday() == 0 and now.hour < 9:  # 월요일 오전 9시 이전 → 금요일로 변경
-        now -= timedelta(days=3)
-
-    # 📌 `thistime` 값을 현재 시간 기준으로 설정 (최신 데이터 반영)
-    thistime = now.strftime('%Y%m%d%H%M%S')
-    
-    # ✅ 1. 전체 페이지 수 확인 (마지막 페이지 찾기)
-    url = f"https://finance.naver.com/item/sise_time.naver?code={ticker}&thistime={thistime}&page=1"
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
-    soup = BeautifulSoup(response.text, "html.parser")
-
-    # 페이지네이션에서 마지막 페이지 번호 찾기
-    pgrr = soup.find("td", class_="pgRR")
-    if pgrr and pgrr.a:
-        last_page = int(pgrr.a["href"].split("=")[-1])  # 마지막 페이지 번호 추출
-    else:
-        last_page = 1  # 페이지 정보가 없으면 기본 1페이지 설정
-
-    print(f"📢 총 페이지 수: {last_page}")  # 디버깅 로그 출력
-
-    # ✅ 2. 모든 페이지 크롤링 (1페이지부터 마지막 페이지까지)
-    for page in range(1, last_page + 1):
-        url = f"https://finance.naver.com/item/sise_time.naver?code={ticker}&thistime={thistime}&page={page}"
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
+    # 📌 페이지 이동하며 데이터 크롤링
+    page = 1
+    while True:
+        url = f"https://finance.naver.com/item/sise_time.naver?code={ticker}&page={page}"
+        driver.get(url)
+        time.sleep(2)  # 페이지 로딩 대기
         
-        soup = BeautifulSoup(response.text, "html.parser")
+        # 📌 페이지 소스 가져와서 BeautifulSoup으로 파싱
+        soup = BeautifulSoup(driver.page_source, "html.parser")
         rows = soup.select("table.type2 tr")
+
+        # 데이터 없으면 종료
+        if not rows or "체결시각" in rows[0].text:
+            break
 
         for row in rows:
             cols = row.find_all("td")
-            if len(cols) < 7:  # 유효한 데이터인지 확인
-                continue
+            if len(cols) < 7:
+                continue  # 데이터가 부족하면 무시
 
             try:
                 time_str = cols[0].text.strip()  # HH:MM 형식의 시간
@@ -204,29 +190,27 @@ def get_intraday_data_naver(ticker):
                 low_price = int(cols[4].text.replace(",", ""))  # 매수 가격 (최저가로 활용)
                 volume = int(cols[5].text.replace(",", ""))  # 거래량
                 
-                # 📌 날짜+시간을 결합하여 timestamp 생성
-                full_datetime = datetime.strptime(f"{now.strftime('%Y-%m-%d')} {time_str}", "%Y-%m-%d %H:%M")
-
-                # 장 시작(9:00) 이후의 데이터만 저장
-                if full_datetime.hour >= 9:
-                    data.append([full_datetime, close_price, high_price, low_price, volume])
-
+                data.append([time_str, close_price, high_price, low_price, volume])
             except ValueError:
-                continue  # 데이터 변환 오류 시 무시
+                continue
 
-        time.sleep(0.5)  # 서버 부하 방지
+        print(f"📢 {page} 페이지 크롤링 완료")
+        page += 1  # 다음 페이지로 이동
 
-    if not data:
-        print("❌ 데이터가 없습니다. 네이버 페이지 구조 변경 가능성 있음.")  # 디버깅 메시지 출력
-        return pd.DataFrame()  # 빈 DataFrame 반환
+    driver.quit()  # 브라우저 종료
 
     # ✅ DataFrame 생성 및 정리
-    df = pd.DataFrame(data, columns=["Date", "Close", "High", "Low", "Volume"])
-    df["Open"] = df["Close"]  # Open 값은 Close 값으로 채움
-    df.set_index("Date", inplace=True)
+    if not data:
+        print("❌ 데이터가 없습니다.")
+        return pd.DataFrame()
 
-    print(f"✅ 가져온 데이터 샘플 ({ticker}):", df.head())  # 디버깅 로그 출력
-    return df.sort_index()  # 시간순 정렬
+    df = pd.DataFrame(data, columns=["Time", "Close", "High", "Low", "Volume"])
+    print(f"✅ 가져온 데이터 샘플:\n", df.head())
+    return df
+
+# ✅ 실행 예시
+ticker = "035720"  # 카카오
+df = get_intraday_data_selenium(ticker)
     
 # ✅ 주가 시각화 함수
 def visualize_stock(company, period):
@@ -239,7 +223,7 @@ def visualize_stock(company, period):
         now = datetime.now()
 
         if period in ["1day", "week"]:
-            df = get_intraday_data_naver(ticker)  # ✅ 네이버 시간별 체결가 반영
+            df = get_intraday_data_selenium(ticker)  # ✅ Selenium 기반 크롤링 적용
         else:
             end_date = now.strftime('%Y-%m-%d')
             start_date = (now - timedelta(days=30 if period == "1month" else 365)).strftime('%Y-%m-%d')
@@ -259,8 +243,6 @@ def visualize_stock(company, period):
                        style='charles', title=f"{company}({ticker}) 주가 ({period})",
                        volume=True, returnfig=True)
     st.pyplot(fig)
-
-
 
 
 #✅ 4. 뉴스 크롤링 & 챗봇 관련 함수
