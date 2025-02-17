@@ -164,10 +164,10 @@ def get_intraday_data_naver(ticker):
     elif now.weekday() == 0 and now.hour < 9:  # 월요일 오전 9시 이전 → 금요일로 변경
         now -= timedelta(days=3)
 
-    # 📌 `thistime` 값을 오늘 날짜 00:00으로 설정 (최신 데이터 반영)
-    thistime = now.strftime('%Y%m%d000000')
+    # 📌 `thistime` 값을 오늘 날짜 00:00 → 현재 시간 기준으로 변경 (최신 데이터 반영)
+    thistime = now.strftime('%Y%m%d%H%M%S')
     
-    # ✅ 1. 전체 페이지 수 확인
+    # ✅ 1. 전체 페이지 수 확인 (디버깅 추가)
     url = f"https://finance.naver.com/item/sise_time.naver?code={ticker}&thistime={thistime}&page=1"
     response = requests.get(url, headers=headers)
     response.raise_for_status()
@@ -178,6 +178,8 @@ def get_intraday_data_naver(ticker):
         last_page = int(pgrr.a["href"].split("=")[-1])
     else:
         last_page = 1  # 페이지 정보가 없으면 기본 1페이지로 설정
+
+    st.write(f"📢 총 페이지 수: {last_page}")  # 디버깅 로그 출력
 
     # ✅ 2. 모든 페이지 크롤링 (1페이지부터 마지막 페이지까지)
     for page in range(1, last_page + 1):
@@ -213,6 +215,7 @@ def get_intraday_data_naver(ticker):
         time.sleep(0.5)  # 서버 부하 방지
 
     if not data:
+        st.write("❌ 데이터가 없습니다. 네이버 페이지 구조 변경 가능성 있음.")  # 디버깅 메시지 출력
         return pd.DataFrame()  # 빈 DataFrame 반환
 
     # ✅ DataFrame 생성 및 정리
@@ -220,6 +223,7 @@ def get_intraday_data_naver(ticker):
     df["Open"] = df["Close"]  # Open 값은 Close 값으로 채움
     df.set_index("Date", inplace=True)
 
+    st.write(f"✅ 가져온 데이터 샘플 ({ticker}):", df.head())  # 디버깅 로그 출력
     return df.sort_index()  # 시간순 정렬
     
 # ✅ 주가 시각화 함수
@@ -232,20 +236,9 @@ def visualize_stock(company, period):
     try:
         now = datetime.now()
 
-        # 📌 주말(토, 일) 또는 월요일 오전 9시 이전이면 금요일 데이터 사용
-        if now.weekday() == 5:  # 토요일이면 금요일 데이터 가져오기
-            now -= timedelta(days=1)
-        elif now.weekday() == 6:  # 일요일이면 금요일 데이터 가져오기
-            now -= timedelta(days=2)
-        elif now.weekday() == 0 and now.hour < 9:  # 월요일 오전 9시 이전이면 금요일 데이터 가져오기
-            now -= timedelta(days=3)
-
         if period in ["1day", "week"]:
-            # ✅ 1day: 오늘 9시부터 현재까지 (네이버 금융 시간별 체결가 활용)
-            # ✅ week: 최근 5일 동안의 시간별 데이터 (네이버 금융 활용)
-            df = get_intraday_data_naver(ticker)
+            df = get_intraday_data_naver(ticker)  # ✅ 네이버 시간별 체결가 반영
         else:
-            # ✅ month, year은 FinanceDataReader(FDR) 활용
             end_date = now.strftime('%Y-%m-%d')
             start_date = (now - timedelta(days=30 if period == "1month" else 365)).strftime('%Y-%m-%d')
             df = fdr.DataReader(ticker, start_date, end_date)
@@ -254,21 +247,15 @@ def visualize_stock(company, period):
             st.warning(f"📉 {company} ({ticker}) - 해당 기간({period})의 거래 데이터가 없습니다.")
             return
 
-        st.write(f"✅ 가져온 데이터 샘플 ({period}):", df.head())  # 🔥 데이터 확인용 로그
+        st.write(f"✅ 가져온 데이터 샘플 ({period}):", df.head())  # 디버깅 로그
 
     except Exception as e:
         st.error(f"주가 데이터를 불러오는 중 오류 발생: {e}")
         return
 
-    # ✅ 차트 그리기
-    fig, _ = mpf.plot(
-        df,
-        type='line' if period in ["1day", "week"] else 'candle',  # 단기 데이터는 라인 차트
-        style='charles',
-        title=f"{company}({ticker}) 주가 ({period})",
-        volume=True,
-        returnfig=True
-    )
+    fig, _ = mpf.plot(df, type='line' if period in ["1day", "week"] else 'candle',
+                       style='charles', title=f"{company}({ticker}) 주가 ({period})",
+                       volume=True, returnfig=True)
     st.pyplot(fig)
 
 
