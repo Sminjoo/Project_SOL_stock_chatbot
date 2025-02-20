@@ -14,6 +14,7 @@ from langchain.memory import ConversationBufferMemory
 import plotly.graph_objects as go
 import os
 import yfinance as yf
+import pandas as pd
 
 
 
