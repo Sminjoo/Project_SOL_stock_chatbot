@@ -16,3 +16,4 @@ plotly
 loguru
 bs4
 yfinance 
+datetime
